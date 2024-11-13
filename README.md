@@ -588,9 +588,60 @@ Run [`npx nvmrc`](https://npmjs.com/nvmrc) to validate an `.nvmrc` file. If that
 
 ### Deeper Shell Integration
 
-You can use [`avn`](https://github.com/wbyoung/avn) to deeply integrate into your shell and automatically invoke `nvm` when changing directories. `avn` is **not** supported by the `nvm` maintainers. Please [report issues to the `avn` team](https://github.com/wbyoung/avn/issues/new).
+You can use [`nvshim`](https://github.com/iamogbz/nvshim) to shim the `node`, `npm`, and `npx` bins to automatically use the `nvm` config in the current directory. `nvshim` is **not** supported by the `nvm` maintainers. Please [report issues to the `nvshim` team](https://github.com/iamogbz/nvshim/issues/new).
 
-You can also use [`nvshim`](https://github.com/iamogbz/nvshim) to shim the `node`, `npm`, and `npx` bins to automatically use the `nvm` config in the current directory. `nvshim` is **not** supported by the `nvm` maintainers. Please [report issues to the `nvshim` team](https://github.com/iamogbz/nvshim/issues/new).
+You can also use [`direnv`](https://github.com/direnv/direnv) to shim the `node`, `npm`, and `npx` bins to automatically use the `nvm` config in the current directory.
+`direnv` is **not** supported by the `nvm` maintainers. Please [report issues to the `direnv` team]([https://github.com/iamogbz/nvshim/issues/new](https://github.com/direnv/direnv/issues)).
+This requires creating an `.envrc` file in the root directory of your project with something similar to the following:
+
+```bash
+# .envrc
+
+ROOT_DIR=$(dirname $0)
+
+use_nvm() {
+    # If there are no .nvmrc file, use the default nvm version
+    if [[ ! $ROOT_DIR = *[^[:space:]]* ]]; then
+
+        declare default_version
+        default_version="$(nvm version default)"
+
+        # If there is no default version, set it to `node`
+        # This will use the latest version on your machine
+        if [ $default_version = 'N/A' ]; then
+            nvm alias default node
+            default_version=$(nvm version default)
+        fi
+
+        # If the current version is not the default version, set it to use the default version
+        if [ "$(nvm current)" != "${default_version}" ]; then
+            nvm use default
+        fi
+    elif [[ -s "${ROOT_DIR}/.nvmrc" && -r "${ROOT_DIR}/.nvmrc" ]]; then
+        declare nvm_version
+        nvm_version=$(<"${ROOT_DIR}"/.nvmrc)
+
+        declare locally_resolved_nvm_version
+        # `nvm ls` will check all locally-available versions
+        # If there are multiple matching versions, take the latest one
+        # Remove the `->` and `*` characters and spaces
+        # `locally_resolved_nvm_version` will be `N/A` if no local versions are found
+        locally_resolved_nvm_version=$(nvm ls --no-colors "${nvm_version}" | command tail -1 | command tr -d '\->*' | command tr -d '[:space:]')
+
+        # If it is not already installed, install it
+        # `nvm install` will implicitly use the newly-installed version
+        if [ "${locally_resolved_nvm_version}" = 'N/A' ]; then
+            nvm install "${nvm_version}";
+        elif [ "$(nvm current)" != "${locally_resolved_nvm_version}" ]; then
+            nvm use "${nvm_version}";
+        fi
+    fi
+}
+
+use_nvm
+```
+
+This looks in the same directory as the `.envrc` file for an `.nvmrc`, loads the node version from it, then uses that version (installing it, if necessary).
 
 If you prefer a lighter-weight solution, the recipes below have been contributed by `nvm` users. They are **not** supported by the `nvm` maintainers. We are, however, accepting pull requests for more examples.
 
